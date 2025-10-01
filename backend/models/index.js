@@ -5,6 +5,7 @@ const User = require('./User');
 const Cliente = require('./Cliente');
 const Expediente = require('./Expediente');
 const ExpedienteSimple = require('./ExpedienteSimple');
+const Actuacion = require('./Actuacion');
 const Documento = require('./Documento');
 const Cita = require('./Cita');
 const Pago = require('./Pago');
@@ -39,6 +40,17 @@ User.hasMany(ExpedienteSimple, {
 });
 
 ExpedienteSimple.belongsTo(User, { 
+  foreignKey: 'usuario_creador_id', 
+  as: 'usuario_creador' 
+});
+
+// Actuacion associations
+User.hasMany(Actuacion, { 
+  foreignKey: 'usuario_creador_id', 
+  as: 'actuaciones' 
+});
+
+Actuacion.belongsTo(User, { 
   foreignKey: 'usuario_creador_id', 
   as: 'usuario_creador' 
 });
@@ -156,6 +168,7 @@ module.exports = {
   Cliente,
   Expediente,
   ExpedienteSimple,
+  Actuacion,
   Documento,
   Cita,
   Pago,

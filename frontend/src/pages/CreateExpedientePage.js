@@ -28,6 +28,7 @@ import { toast } from 'react-toastify';
 import { useDropzone } from 'react-dropzone';
 
 import { expedienteService } from '../services/expedienteService';
+import { actuacionService } from '../services/actuacionService';
 
 const schema = yup.object({
   nombre_solicitante: yup
@@ -104,16 +105,24 @@ const CreateExpedientePage = () => {
         formData.append('archivo_escaneado', uploadedFile);
       }
 
-      const response = await expedienteService.createExpediente(formData);
-      console.log('Create expediente response:', response);
-      const expedienteId = response.data.expediente.id;
+      // Determine which service to use based on tipo_expediente
+      const isExpediente = data.tipo_expediente === 'true' || data.tipo_expediente === true;
+      const service = isExpediente ? expedienteService : actuacionService;
+      const entityType = isExpediente ? 'expediente' : 'actuacion';
+      const entityTypeCapitalized = isExpediente ? 'Expediente' : 'Actuación';
       
-      toast.success('¡Expediente creado exitosamente!');
+      console.log(`Creating ${entityType} with tipo_expediente:`, data.tipo_expediente);
+      
+      const response = await service.createExpediente(formData);
+      console.log(`Create ${entityType} response:`, response);
+      const entityId = response.data[entityType].id;
+      
+      toast.success(`¡${entityTypeCapitalized} creado exitosamente!`);
 
       // Automatically download and open the receipt for printing
       try {
-        console.log('Attempting to download comprobante for expediente:', expedienteId);
-        const comprobanteResponse = await expedienteService.downloadComprobante(expedienteId);
+        console.log(`Attempting to download comprobante for ${entityType}:`, entityId);
+        const comprobanteResponse = await service.downloadComprobante(entityId);
         console.log('Comprobante response received:', comprobanteResponse);
         
         // Create blob URL for the PDF
@@ -138,7 +147,7 @@ const CreateExpedientePage = () => {
           // Fallback: download the file if popup is blocked
           const link = document.createElement('a');
           link.href = url;
-          link.download = `comprobante-${response.data.expediente.numero_expediente.replace(/\//g, '-')}.pdf`;
+          link.download = `comprobante-${(response.data[entityType].numero_expediente || response.data[entityType].numero_actuacion).replace(/\//g, '-')}.pdf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -153,10 +162,15 @@ const CreateExpedientePage = () => {
         
       } catch (comprobanteError) {
         console.error('Error downloading comprobante:', comprobanteError);
-        toast.warning('Expediente creado, pero hubo un problema al generar el comprobante. Puede descargarlo desde la página de detalles.');
+        toast.warning(`${entityTypeCapitalized} creado, pero hubo un problema al generar el comprobante. Puede descargarlo desde la página de detalles.`);
       }
 
-      navigate(`/expedientes/${expedienteId}`);
+      // Navigate to the appropriate page
+      if (isExpediente) {
+        navigate(`/expedientes/${entityId}`);
+      } else {
+        navigate(`/actuaciones/${entityId}`);
+      }
     } catch (error) {
       console.error('Error creating expediente:', error);
       toast.error('Error al crear el expediente');

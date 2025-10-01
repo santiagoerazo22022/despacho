@@ -10,14 +10,14 @@
   "test": {
     "username": "root",
     "password": "",
-    "database": "despacho_juridico_test",
+    "database": "despacho_test",
     "host": "127.0.0.1",
     "dialect": "mysql"
   },
   "production": {
     "username": "root",
     "password": "",
-    "database": "despacho_juridico_prod",
+    "database": "despacho_prod",
     "host": "127.0.0.1",
     "dialect": "mysql"
   }

@@ -1,5 +1,5 @@
 const ExpedienteSimple = require('../models/ExpedienteSimple');
-const { User, Decreto } = require('../models');
+const { User, Decreto, sequelize } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
 const { generateExpedienteSimpleReceipt, generateUniqueFilename, ensureComprobantesDir } = require('../utils/pdfGenerator');
@@ -8,18 +8,20 @@ const path = require('path');
 /**
  * Generate unique expediente number based on type
  */
-const generateExpedienteNumber = async (tipoExpediente = true) => {
+const generateExpedienteNumber = async () => {
   const year = new Date().getFullYear().toString().slice(-2); // Obtener últimos 2 dígitos del año
   
-  // Buscar el número más alto existente para este año y tipo
+  // Buscar el número más alto existente para este año usando ordenamiento numérico
   const lastExpediente = await ExpedienteSimple.findOne({
     where: {
       numero_expediente: {
         [Op.like]: `%/${year}`
       },
-      tipo_expediente: tipoExpediente
+      tipo_expediente: true // Solo expedientes
     },
-    order: [['numero_expediente', 'DESC']]
+    order: [
+      [sequelize.literal('CAST(SUBSTRING_INDEX(numero_expediente, "/", 1) AS UNSIGNED)'), 'DESC']
+    ]
   });
   
   let nextNumber = 1;
@@ -32,7 +34,7 @@ const generateExpedienteNumber = async (tipoExpediente = true) => {
   }
   
   const generatedNumber = `${nextNumber}/${year}`;
-  console.log(`Generated expediente number: ${generatedNumber} for tipo: ${tipoExpediente}`);
+  console.log(`Generated expediente number: ${generatedNumber}`);
   return generatedNumber;
 };
 
@@ -231,12 +233,11 @@ const createExpediente = async (req, res) => {
     const { 
       nombre_solicitante, 
       area, 
-      descripcion,
-      tipo_expediente = true
+      descripcion
     } = req.body;
 
     // Generate expediente number automatically
-    const numeroExpediente = await generateExpedienteNumber(tipo_expediente);
+    const numeroExpediente = await generateExpedienteNumber();
     console.log('Generated expediente number:', numeroExpediente);
 
     // Handle file upload if present
@@ -254,7 +255,7 @@ const createExpediente = async (req, res) => {
       nombre_solicitante,
       area,
       descripcion,
-      tipo_expediente,
+      tipo_expediente: true, // Siempre true para expedientes
       nombre_archivo_escaneado: nombreArchivoEscaneado,
       ruta_archivo_escaneado: rutaArchivoEscaneado,
       usuario_creador_id: req.user.id
@@ -311,7 +312,7 @@ const createExpediente = async (req, res) => {
         fs.unlinkSync(req.file.path);
       }
     }
-
+    
     console.error('Create expediente error:', error);
     
     // Handle specific error cases

@@ -19,6 +19,7 @@ const userRoutes = require('./routes/users');
 const clienteRoutes = require('./routes/clientes');
 const expedienteRoutes = require('./routes/expedientes');
 const expedienteSimpleRoutes = require('./routes/expedientesSimple');
+const actuacionRoutes = require('./routes/actuaciones');
 const decretoRoutes = require('./routes/decretos');
 
 // Create Express app
@@ -104,6 +105,7 @@ app.use('/api/users', userRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/expedientes', expedienteRoutes);
 app.use('/api/expedientes-simple', expedienteSimpleRoutes);
+app.use('/api/actuaciones', actuacionRoutes);
 app.use('/api/decretos', decretoRoutes);
 
 // API info endpoint
@@ -118,6 +120,7 @@ app.get('/api', (req, res) => {
       clientes: '/api/clientes',
       expedientes: '/api/expedientes',
       expedientesSimple: '/api/expedientes-simple',
+      actuaciones: '/api/actuaciones',
       decretos: '/api/decretos',
       documentos: '/api/expedientes/:id/documentos'
     }
