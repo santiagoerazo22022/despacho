@@ -266,27 +266,15 @@ const expedienteSimpleValidation = {
       .isLength({ min: 2, max: 255 })
       .withMessage('El nombre debe tener entre 2 y 255 caracteres'),
     
-    body('dni')
-      .notEmpty()
-      .withMessage('El DNI es requerido')
-      .isLength({ min: 8, max: 20 })
-      .withMessage('El DNI debe tener entre 8 y 20 caracteres'),
-    
     body('area')
-      .notEmpty()
-      .withMessage('El área es requerida')
-      .isLength({ min: 2, max: 100 })
-      .withMessage('El área debe tener entre 2 y 100 caracteres'),
+      .optional()
+      .isLength({ min: 0, max: 100 })
+      .withMessage('El área no puede exceder 100 caracteres'),
     
     body('descripcion')
       .optional()
       .isLength({ max: 1000 })
       .withMessage('La descripción no puede exceder 1000 caracteres'),
-    
-    body('numero_expediente')
-      .optional()
-      .isLength({ min: 4, max: 50 })
-      .withMessage('El número de expediente debe tener entre 4 y 50 caracteres'),
     
     body('tipo_expediente')
       .optional()
@@ -300,15 +288,10 @@ const expedienteSimpleValidation = {
       .isLength({ min: 2, max: 255 })
       .withMessage('El nombre debe tener entre 2 y 255 caracteres'),
     
-    body('dni')
-      .optional()
-      .isLength({ min: 8, max: 20 })
-      .withMessage('El DNI debe tener entre 8 y 20 caracteres'),
-    
     body('area')
       .optional()
-      .isLength({ min: 2, max: 100 })
-      .withMessage('El área debe tener entre 2 y 100 caracteres'),
+      .isLength({ min: 0, max: 100 })
+      .withMessage('El área no puede exceder 100 caracteres'),
     
     body('descripcion')
       .optional()
@@ -319,6 +302,146 @@ const expedienteSimpleValidation = {
       .optional()
       .isBoolean()
       .withMessage('El tipo de expediente debe ser un valor booleano')
+  ]
+};
+
+// Decreto validation rules
+const decretoValidation = {
+  create: [
+    body('numero_decreto')
+      .notEmpty()
+      .withMessage('El número de decreto es requerido')
+      .isLength({ min: 3, max: 50 })
+      .withMessage('El número de decreto debe tener entre 3 y 50 caracteres'),
+    
+    body('tipo_documento')
+      .notEmpty()
+      .withMessage('El tipo de documento es requerido')
+      .isIn(['decreto', 'resolucion'])
+      .withMessage('Tipo de documento inválido'),
+    
+    body('titulo')
+      .notEmpty()
+      .withMessage('El título es requerido')
+      .isLength({ min: 5, max: 255 })
+      .withMessage('El título debe tener entre 5 y 255 caracteres'),
+    
+    body('descripcion')
+      .optional()
+      .isLength({ max: 2000 })
+      .withMessage('La descripción no puede exceder 2000 caracteres'),
+    
+    body('fecha_emision')
+      .optional()
+      .isISO8601()
+      .withMessage('Fecha de emisión inválida'),
+    
+    body('fecha_vigencia')
+      .optional()
+      .isISO8601()
+      .withMessage('Fecha de vigencia inválida'),
+    
+    body('estado')
+      .optional()
+      .isIn(['vigente', 'suspendido', 'derogado', 'vencido'])
+      .withMessage('Estado inválido'),
+    
+    body('autoridad_emisora')
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage('La autoridad emisora no puede exceder 255 caracteres'),
+    
+    body('secretaria')
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage('La secretaría no puede exceder 255 caracteres'),
+    
+    body('numero_expediente_vinculado')
+      .optional()
+      .isLength({ max: 50 })
+      .withMessage('El número de expediente vinculado no puede exceder 50 caracteres'),
+    
+    body('tipo_expediente_vinculado')
+      .optional()
+      .isIn(['expediente', 'actuacion'])
+      .withMessage('Tipo de expediente vinculado inválido'),
+    
+    body('expediente_simple_id')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('ID de expediente simple inválido'),
+    
+    body('notas')
+      .optional()
+      .isLength({ max: 1000 })
+      .withMessage('Las notas no pueden exceder 1000 caracteres')
+  ],
+  
+  update: [
+    body('numero_decreto')
+      .optional()
+      .isLength({ min: 3, max: 50 })
+      .withMessage('El número de decreto debe tener entre 3 y 50 caracteres'),
+    
+    body('tipo_documento')
+      .optional()
+      .isIn(['decreto', 'resolucion'])
+      .withMessage('Tipo de documento inválido'),
+    
+    body('titulo')
+      .optional()
+      .isLength({ min: 5, max: 255 })
+      .withMessage('El título debe tener entre 5 y 255 caracteres'),
+    
+    body('descripcion')
+      .optional()
+      .isLength({ max: 2000 })
+      .withMessage('La descripción no puede exceder 2000 caracteres'),
+    
+    body('fecha_emision')
+      .optional()
+      .isISO8601()
+      .withMessage('Fecha de emisión inválida'),
+    
+    body('fecha_vigencia')
+      .optional()
+      .isISO8601()
+      .withMessage('Fecha de vigencia inválida'),
+    
+    body('estado')
+      .optional()
+      .isIn(['vigente', 'suspendido', 'derogado', 'vencido'])
+      .withMessage('Estado inválido'),
+    
+    body('autoridad_emisora')
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage('La autoridad emisora no puede exceder 255 caracteres'),
+    
+    body('secretaria')
+      .optional()
+      .isLength({ max: 255 })
+      .withMessage('La secretaría no puede exceder 255 caracteres'),
+    
+    body('numero_expediente_vinculado')
+      .optional()
+      .isLength({ max: 50 })
+      .withMessage('El número de expediente vinculado no puede exceder 50 caracteres'),
+    
+    body('tipo_expediente_vinculado')
+      .optional()
+      .isIn(['expediente', 'actuacion'])
+      .withMessage('Tipo de expediente vinculado inválido'),
+    
+    body('expediente_simple_id')
+      .optional()
+      .isInt({ min: 1 })
+      .withMessage('ID de expediente simple inválido'),
+    
+    body('notas')
+      .optional()
+      .isLength({ max: 1000 })
+      .withMessage('Las notas no pueden exceder 1000 caracteres')
   ]
 };
 
@@ -348,5 +471,6 @@ module.exports = {
   clienteValidation,
   expedienteValidation,
   expedienteSimpleValidation,
+  decretoValidation,
   commonValidation
 };

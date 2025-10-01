@@ -7,9 +7,9 @@ import Layout from './components/Layout/Layout';
 import LoginPage from './pages/LoginPage';
 import DashboardPage from './pages/DashboardPage';
 import ExpedientesPage from './pages/ExpedientesPage';
-import ExpedienteDetailPage from './pages/ExpedienteDetailPage';
-import CreateExpedientePage from './pages/CreateExpedientePage';
-import EditExpedientePage from './pages/EditExpedientePage';
+import DecretosPage from './pages/DecretosPage';
+import DecretoDetailPage from './pages/DecretoDetailPage';
+import CreateEditDecretoPage from './pages/CreateEditDecretoPage';
 import UsersPage from './pages/UsersPage';
 import ProfilePage from './pages/ProfilePage';
 import ProtectedRoute from './components/ProtectedRoute';
@@ -50,9 +50,10 @@ function App() {
         <Route index element={<Navigate to="/dashboard" replace />} />
         <Route path="dashboard" element={<DashboardPage />} />
         <Route path="expedientes" element={<ExpedientesPage />} />
-        <Route path="expedientes/nuevo" element={<CreateExpedientePage />} />
-        <Route path="expedientes/:id" element={<ExpedienteDetailPage />} />
-        <Route path="expedientes/:id/editar" element={<EditExpedientePage />} />
+        <Route path="decretos" element={<DecretosPage />} />
+        <Route path="decretos/create" element={<CreateEditDecretoPage />} />
+        <Route path="decretos/:id" element={<DecretoDetailPage />} />
+        <Route path="decretos/:id/edit" element={<CreateEditDecretoPage />} />
         <Route
           path="usuarios"
           element={

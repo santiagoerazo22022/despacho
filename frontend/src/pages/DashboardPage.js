@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Grid,
@@ -11,7 +11,6 @@ import {
   ListItem,
   ListItemText,
   ListItemAvatar,
-  Chip,
   Paper,
   IconButton,
 } from '@mui/material';
@@ -37,7 +36,7 @@ const DashboardPage = () => {
   const [recentExpedientes, setRecentExpedientes] = useState([]);
   const [loading, setLoading] = useState(true);
 
-  const fetchDashboardData = async () => {
+  const fetchDashboardData = useCallback(async () => {
     try {
       setLoading(true);
       
@@ -58,52 +57,64 @@ const DashboardPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [user?.rol]);
 
   useEffect(() => {
     fetchDashboardData();
-  }, [user]);
+  }, [user, fetchDashboardData]);
 
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES', {
-      year: 'numeric',
-      month: 'short',
-      day: 'numeric',
-    });
+    if (!dateString) {
+      return 'N/A';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida';
+      }
+      return date.toLocaleDateString('es-ES', {
+        year: 'numeric',
+        month: 'short',
+        day: 'numeric',
+      });
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
   return (
-    <Box>
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
       <Box sx={{ mb: 3 }}>
-        <Typography variant="h4" gutterBottom>
+        <Typography variant="h4" gutterBottom sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
           Dashboard
         </Typography>
-        <Typography variant="body1" color="text.secondary">
+        <Typography variant="body1" color="text.secondary" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
           Bienvenido, {user?.nombre} {user?.apellido}
         </Typography>
       </Box>
 
       {/* Stats Cards - Solo para admin */}
       {user?.rol === 'admin' && stats && (
-        <Grid container spacing={3} sx={{ mb: 4 }}>
+        <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mb: 4 }}>
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
+            <Card sx={{ height: '100%' }}>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'primary.main', mr: 2 }}>
-                    <AssignmentIcon />
+                  <Avatar sx={{ bgcolor: 'primary.main', mr: 2, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}>
+                    <AssignmentIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="h4" color="primary">
+                    <Typography variant="h4" color="primary" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
                       {stats.expedientes?.total || 0}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       Total Expedientes
                     </Typography>
                   </Box>
                 </Box>
-                <Typography variant="body2" color="success.main">
+                <Typography variant="body2" color="success.main" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                   {stats.expedientes?.active || 0} activos
                 </Typography>
               </CardContent>
@@ -111,22 +122,22 @@ const DashboardPage = () => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
+            <Card sx={{ height: '100%' }}>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'secondary.main', mr: 2 }}>
-                    <PeopleIcon />
+                  <Avatar sx={{ bgcolor: 'secondary.main', mr: 2, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}>
+                    <PeopleIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="h4" color="secondary">
+                    <Typography variant="h4" color="secondary" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
                       {stats.users?.total || 0}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       Total Usuarios
                     </Typography>
                   </Box>
                 </Box>
-                <Typography variant="body2" color="success.main">
+                <Typography variant="body2" color="success.main" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                   {stats.users?.active || 0} activos
                 </Typography>
               </CardContent>
@@ -134,22 +145,22 @@ const DashboardPage = () => {
           </Grid>
 
           <Grid item xs={12} sm={6} md={3}>
-            <Card>
-              <CardContent>
+            <Card sx={{ height: '100%' }}>
+              <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
                 <Box sx={{ display: 'flex', alignItems: 'center', mb: 2 }}>
-                  <Avatar sx={{ bgcolor: 'warning.main', mr: 2 }}>
-                    <TrendingUpIcon />
+                  <Avatar sx={{ bgcolor: 'warning.main', mr: 2, width: { xs: 40, sm: 48 }, height: { xs: 40, sm: 48 } }}>
+                    <TrendingUpIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                   </Avatar>
                   <Box>
-                    <Typography variant="h4" color="warning.main">
+                    <Typography variant="h4" color="warning.main" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
                       {stats.users?.admin || 0}
                     </Typography>
-                    <Typography variant="body2" color="text.secondary">
+                    <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       Administradores
                     </Typography>
                   </Box>
                 </Box>
-                <Typography variant="body2" color="text.secondary">
+                <Typography variant="body2" color="text.secondary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                   {stats.users?.administrative || 0} administrativos
                 </Typography>
               </CardContent>
@@ -178,12 +189,12 @@ const DashboardPage = () => {
         </Grid>
       )}
 
-      <Grid container spacing={3}>
+      <Grid container spacing={{ xs: 2, sm: 3 }}>
         {/* Quick Actions */}
         <Grid item xs={12} md={4}>
-          <Card>
-            <CardContent>
-              <Typography variant="h6" gutterBottom>
+          <Card sx={{ height: '100%' }}>
+            <CardContent sx={{ p: { xs: 2, sm: 3 } }}>
+              <Typography variant="h6" gutterBottom sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                 Acciones Rápidas
               </Typography>
               <Box sx={{ display: 'flex', flexDirection: 'column', gap: 2 }}>
@@ -191,17 +202,25 @@ const DashboardPage = () => {
                   variant="contained"
                   startIcon={<AddIcon />}
                   fullWidth
-                  onClick={() => navigate('/expedientes/nuevo')}
+                  onClick={() => navigate('/expedientes')}
+                  size="large"
+                  sx={{ py: { xs: 1.5, sm: 2 } }}
                 >
-                  Nuevo Expediente
+                  <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                    Nuevo Expediente
+                  </Typography>
                 </Button>
                 <Button
                   variant="outlined"
                   startIcon={<FolderIcon />}
                   fullWidth
                   onClick={() => navigate('/expedientes')}
+                  size="large"
+                  sx={{ py: { xs: 1.5, sm: 2 } }}
                 >
-                  Ver Expedientes
+                  <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                    Ver Expedientes
+                  </Typography>
                 </Button>
                 {user?.rol === 'admin' && (
                   <Button
@@ -209,8 +228,12 @@ const DashboardPage = () => {
                     startIcon={<PeopleIcon />}
                     fullWidth
                     onClick={() => navigate('/usuarios')}
+                    size="large"
+                    sx={{ py: { xs: 1.5, sm: 2 } }}
                   >
-                    Gestionar Usuarios
+                    <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                      Gestionar Usuarios
+                    </Typography>
                   </Button>
                 )}
               </Box>
@@ -220,13 +243,13 @@ const DashboardPage = () => {
 
         {/* Recent Expedientes */}
         <Grid item xs={12} md={8}>
-          <Paper sx={{ p: 2 }}>
+          <Paper sx={{ p: { xs: 2, sm: 3 }, height: '100%' }}>
             <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 2 }}>
-              <Typography variant="h6">
+              <Typography variant="h6" sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }}>
                 Expedientes Recientes
               </Typography>
-              <IconButton onClick={fetchDashboardData} disabled={loading}>
-                <RefreshIcon />
+              <IconButton onClick={fetchDashboardData} disabled={loading} size="small">
+                <RefreshIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
               </IconButton>
             </Box>
             
@@ -241,6 +264,8 @@ const DashboardPage = () => {
                       borderRadius: 1,
                       mb: 1,
                       cursor: 'pointer',
+                      px: { xs: 1, sm: 2 },
+                      py: { xs: 1, sm: 1.5 },
                       '&:hover': {
                         backgroundColor: 'action.hover',
                       },
@@ -248,27 +273,27 @@ const DashboardPage = () => {
                     onClick={() => navigate(`/expedientes/${expediente.id}`)}
                   >
                     <ListItemAvatar>
-                      <Avatar sx={{ bgcolor: 'primary.main' }}>
-                        <AssignmentIcon />
+                      <Avatar sx={{ bgcolor: 'primary.main', width: { xs: 32, sm: 40 }, height: { xs: 32, sm: 40 } }}>
+                        <AssignmentIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
                       </Avatar>
                     </ListItemAvatar>
                     <ListItemText
                       primary={
                         <Box sx={{ display: 'flex', alignItems: 'center', gap: 1 }}>
-                          <Typography variant="subtitle1">
+                          <Typography variant="subtitle1" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
                             {expediente.numero_expediente}
                           </Typography>
-            <Typography variant="caption" color={expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'primary' : 'secondary'}>
-              ({expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'Expediente' : 'Actuación'})
-            </Typography>
+                          <Typography variant="caption" color={expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'primary' : 'secondary'} sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
+                            ({expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'Expediente' : 'Actuación'})
+                          </Typography>
                         </Box>
                       }
                       secondary={
                         <Box>
-                          <Typography variant="body2" color="text.primary">
+                          <Typography variant="body2" color="text.primary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                             {expediente.nombre_solicitante}
                           </Typography>
-                          <Typography variant="caption" color="text.secondary">
+                          <Typography variant="caption" color="text.secondary" sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}>
                             {expediente.area} • {formatDate(expediente.fecha_carga)}
                           </Typography>
                         </Box>

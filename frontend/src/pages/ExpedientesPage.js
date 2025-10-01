@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -14,33 +14,26 @@ import {
   TextField,
   InputAdornment,
   IconButton,
-  Menu,
-  MenuItem,
   Grid,
   Tooltip,
   FormControl,
   InputLabel,
   Select,
+  MenuItem,
 } from '@mui/material';
 import {
   Add as AddIcon,
   Search as SearchIcon,
-  MoreVert as MoreVertIcon,
   Visibility as VisibilityIcon,
-  Download as DownloadIcon,
-  GetApp as GetAppIcon,
   Edit as EditIcon,
   Delete as DeleteIcon,
 } from '@mui/icons-material';
-import { useNavigate } from 'react-router-dom';
-import { toast } from 'react-toastify';
-
 import { expedienteService } from '../services/expedienteService';
-import { useAuth } from '../contexts/AuthContext';
+import { toast } from 'react-toastify';
+import ExpedienteModal from '../components/ExpedienteModal/ExpedienteModal';
+import ExpedienteDetailModal from '../components/ExpedienteDetailModal/ExpedienteDetailModal';
 
 const ExpedientesPage = () => {
-  const navigate = useNavigate();
-  const { user } = useAuth();
   const [expedientes, setExpedientes] = useState([]);
   const [loading, setLoading] = useState(true);
   const [page, setPage] = useState(0);
@@ -49,10 +42,14 @@ const ExpedientesPage = () => {
   const [searchTerm, setSearchTerm] = useState('');
   const [areaFilter, setAreaFilter] = useState('');
   const [tipoFilter, setTipoFilter] = useState('');
-  const [anchorEl, setAnchorEl] = useState(null);
-  const [selectedExpediente, setSelectedExpediente] = useState(null);
 
-  const fetchExpedientes = async () => {
+  // Modal states
+  const [modalOpen, setModalOpen] = useState(false);
+  const [detailModalOpen, setDetailModalOpen] = useState(false);
+  const [editingExpediente, setEditingExpediente] = useState(null);
+  const [viewingExpedienteId, setViewingExpedienteId] = useState(null);
+
+  const fetchExpedientes = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -77,16 +74,21 @@ const ExpedientesPage = () => {
     } finally {
       setLoading(false);
     }
-  };
-
-  useEffect(() => {
-    fetchExpedientes();
   }, [page, rowsPerPage, searchTerm, areaFilter, tipoFilter]);
 
-  // Refrescar datos cuando se monta el componente
   useEffect(() => {
     fetchExpedientes();
-  }, []);
+  }, [fetchExpedientes]);
+
+  // Función para refrescar la lista cuando se regresa de editar
+  useEffect(() => {
+    const handleFocus = () => {
+      fetchExpedientes();
+    };
+
+    window.addEventListener('focus', handleFocus);
+    return () => window.removeEventListener('focus', handleFocus);
+  }, [fetchExpedientes]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -102,120 +104,101 @@ const ExpedientesPage = () => {
     setPage(0);
   };
 
-  const handleMenuClick = (event, expediente) => {
-    setAnchorEl(event.currentTarget);
-    setSelectedExpediente(expediente);
+  // Modal handlers
+  const handleCreateExpediente = () => {
+    setEditingExpediente(null);
+    setModalOpen(true);
   };
 
-  const handleMenuClose = () => {
-    setAnchorEl(null);
-    setSelectedExpediente(null);
+  const handleEditExpedienteModal = (expediente) => {
+    setEditingExpediente(expediente);
+    setModalOpen(true);
   };
 
-  const handleViewExpediente = () => {
-    navigate(`/expedientes/${selectedExpediente.id}`);
-    handleMenuClose();
+  const handleViewExpediente = (expedienteId) => {
+    setViewingExpedienteId(expedienteId);
+    setDetailModalOpen(true);
   };
 
-  const handleDownloadFile = async () => {
-    try {
-      if (!selectedExpediente.nombre_archivo_escaneado) {
-        toast.warning('Este expediente no tiene archivo escaneado');
-        return;
-      }
-
-      const response = await expedienteService.downloadFile(selectedExpediente.id);
-      expedienteService.downloadFileHelper(
-        response.data,
-        selectedExpediente.nombre_archivo_escaneado
-      );
-      toast.success('Archivo descargado exitosamente');
-    } catch (error) {
-      toast.error('Error al descargar el archivo');
-    } finally {
-      handleMenuClose();
-    }
-  };
-
-  const handleDownloadComprobante = async () => {
-    try {
-      const response = await expedienteService.downloadComprobante(selectedExpediente.id);
-      expedienteService.downloadFileHelper(
-        response.data,
-        `comprobante-${selectedExpediente.numero_expediente}.pdf`
-      );
-      toast.success('Comprobante descargado exitosamente');
-    } catch (error) {
-      toast.error('Error al descargar el comprobante');
-    } finally {
-      handleMenuClose();
-    }
-  };
-
-  const handleEditExpediente = () => {
-    navigate(`/expedientes/${selectedExpediente.id}/editar`);
-    handleMenuClose();
-  };
-
-  // Función para refrescar la lista cuando se regresa de editar
-  useEffect(() => {
-    const handleFocus = () => {
-      fetchExpedientes();
-    };
-
-    window.addEventListener('focus', handleFocus);
-    return () => window.removeEventListener('focus', handleFocus);
-  }, []);
-
-  const handleDeleteExpediente = async () => {
+  const handleDeleteExpedienteModal = async (expediente) => {
     if (!window.confirm('¿Estás seguro de que quieres eliminar este expediente?')) {
       return;
     }
 
     try {
-      await expedienteService.deleteExpediente(selectedExpediente.id);
+      await expedienteService.deleteExpediente(expediente.id);
       toast.success('Expediente eliminado exitosamente');
-      fetchExpedientes(); // Refresh the list
+      fetchExpedientes();
     } catch (error) {
       toast.error('Error al eliminar el expediente');
-    } finally {
-      handleMenuClose();
     }
   };
 
+  const handleModalSuccess = () => {
+    fetchExpedientes();
+  };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
+    if (!dateString) {
+      return 'N/A';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida';
+      }
+      return date.toLocaleDateString('es-ES');
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        mb: 3,
+        gap: { xs: 2, sm: 0 }
+      }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
           Expedientes
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
-          onClick={() => navigate('/expedientes/nuevo')}
+          onClick={handleCreateExpediente}
+          size="large"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Nuevo Expediente
+          <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+            Nuevo Expediente
+          </Typography>
         </Button>
       </Box>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+        <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="center">
           <Grid item xs={12} sm={6} md={4}>
             <TextField
               fullWidth
               label="Buscar expedientes"
               value={searchTerm}
               onChange={handleSearchChange}
+              size="medium"
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                   </InputAdornment>
                 ),
               }}
@@ -230,11 +213,17 @@ const ExpedientesPage = () => {
                 setAreaFilter(e.target.value);
                 setPage(0);
               }}
+              size="medium"
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }
+              }}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Tipo</InputLabel>
+            <FormControl fullWidth size="medium">
+              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Tipo</InputLabel>
               <Select
                 value={tipoFilter}
                 label="Tipo"
@@ -242,10 +231,13 @@ const ExpedientesPage = () => {
                   setTipoFilter(e.target.value);
                   setPage(0);
                 }}
+                sx={{
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}
               >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="true">Expediente</MenuItem>
-                <MenuItem value="false">Actuación</MenuItem>
+                <MenuItem value="" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Todos</MenuItem>
+                <MenuItem value="true" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Expediente</MenuItem>
+                <MenuItem value="false" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Actuación</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -259,26 +251,42 @@ const ExpedientesPage = () => {
                 setTipoFilter('');
                 setPage(0);
               }}
+              size="large"
+              sx={{ py: { xs: 1.5, sm: 2 } }}
             >
-              Limpiar
+              <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Limpiar
+              </Typography>
             </Button>
           </Grid>
         </Grid>
       </Paper>
 
       {/* Table */}
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+        <Table sx={{ minWidth: 600 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Número</TableCell>
-              <TableCell>Solicitante</TableCell>
-              <TableCell>DNI</TableCell>
-              <TableCell>Área</TableCell>
-              <TableCell>Tipo</TableCell>
-              <TableCell>Fecha</TableCell>
-              <TableCell>Usuario</TableCell>
-              <TableCell align="center">Acciones</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Número</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Solicitante</TableCell>
+              <TableCell sx={{ 
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                fontWeight: 'bold',
+                display: { xs: 'none', sm: 'table-cell' }
+              }}>DNI</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Área</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Tipo</TableCell>
+              <TableCell sx={{ 
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                fontWeight: 'bold',
+                display: { xs: 'none', md: 'table-cell' }
+              }}>Fecha</TableCell>
+              <TableCell sx={{ 
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                fontWeight: 'bold',
+                display: { xs: 'none', lg: 'table-cell' }
+              }}>Usuario</TableCell>
+              <TableCell align="center" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -297,40 +305,79 @@ const ExpedientesPage = () => {
             ) : (
               expedientes.map((expediente) => (
                 <TableRow key={expediente.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="bold" color="primary">
+                  <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <Typography variant="body2" fontWeight="bold" color="primary" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       {expediente.numero_expediente}
                     </Typography>
                   </TableCell>
-                  <TableCell>{expediente.nombre_solicitante}</TableCell>
-                  <TableCell>{expediente.dni}</TableCell>
-                  <TableCell>{expediente.area}</TableCell>
+                  <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                      {expediente.nombre_solicitante}
+                    </Typography>
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    display: { xs: 'none', sm: 'table-cell' }
+                  }}>
+                    {expediente.dni}
+                  </TableCell>
+                  <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    {expediente.area}
+                  </TableCell>
                   <TableCell>
-                    <Typography variant="body2" color={expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'primary' : 'secondary'}>
+                    <Typography 
+                      variant="body2" 
+                      color={expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'primary' : 'secondary'}
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
+                    >
                       {expediente.tipo_expediente === true || expediente.tipo_expediente === 1 ? 'Expediente' : 'Actuación'}
                     </Typography>
                   </TableCell>
-                  <TableCell>{formatDate(expediente.fecha_carga)}</TableCell>
-                  <TableCell>
+                  <TableCell sx={{ 
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    display: { xs: 'none', md: 'table-cell' }
+                  }}>
+                    {formatDate(expediente.fecha_carga)}
+                  </TableCell>
+                  <TableCell sx={{ 
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    display: { xs: 'none', lg: 'table-cell' }
+                  }}>
                     {expediente.usuario_creador
                       ? `${expediente.usuario_creador.nombre} ${expediente.usuario_creador.apellido}`
                       : 'N/A'}
                   </TableCell>
                   <TableCell align="center">
-                    <Tooltip title="Ver detalles">
-                      <IconButton
-                        size="small"
-                        onClick={() => navigate(`/expedientes/${expediente.id}`)}
-                      >
-                        <VisibilityIcon />
-                      </IconButton>
-                    </Tooltip>
-                    <IconButton
-                      size="small"
-                      onClick={(e) => handleMenuClick(e, expediente)}
-                    >
-                      <MoreVertIcon />
-                    </IconButton>
+                    <Box sx={{ display: 'flex', gap: 0.5, justifyContent: 'center' }}>
+                      <Tooltip title="Ver detalles">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleViewExpediente(expediente.id)}
+                          sx={{ p: { xs: 0.5, sm: 1 } }}
+                        >
+                          <VisibilityIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Editar">
+                        <IconButton
+                          size="small"
+                          onClick={() => handleEditExpedienteModal(expediente)}
+                          sx={{ p: { xs: 0.5, sm: 1 } }}
+                        >
+                          <EditIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                        </IconButton>
+                      </Tooltip>
+                      <Tooltip title="Eliminar">
+                        <IconButton
+                          size="small"
+                          color="error"
+                          onClick={() => handleDeleteExpedienteModal(expediente)}
+                          sx={{ p: { xs: 0.5, sm: 1 } }}
+                        >
+                          <DeleteIcon sx={{ fontSize: { xs: '1rem', sm: '1.25rem' } }} />
+                        </IconButton>
+                      </Tooltip>
+                    </Box>
                   </TableCell>
                 </TableRow>
               ))
@@ -350,43 +397,33 @@ const ExpedientesPage = () => {
           labelDisplayedRows={({ from, to, count }) =>
             `${from}-${to} de ${count !== -1 ? count : `más de ${to}`}`
           }
+          sx={{
+            '& .MuiTablePagination-toolbar': {
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 1, sm: 0 }
+            },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+            }
+          }}
         />
       </TableContainer>
 
-      {/* Context Menu */}
-      <Menu
-        anchorEl={anchorEl}
-        open={Boolean(anchorEl)}
-        onClose={handleMenuClose}
-      >
-        <MenuItem onClick={handleViewExpediente}>
-          <VisibilityIcon sx={{ mr: 1 }} />
-          Ver Detalles
-        </MenuItem>
-        {selectedExpediente?.nombre_archivo_escaneado && (
-          <MenuItem onClick={handleDownloadFile}>
-            <DownloadIcon sx={{ mr: 1 }} />
-            Descargar Archivo
-          </MenuItem>
-        )}
-        <MenuItem onClick={handleDownloadComprobante}>
-          <GetAppIcon sx={{ mr: 1 }} />
-          Descargar Comprobante
-        </MenuItem>
-        {/* Show edit/delete options for admin and administrativo users */}
-        {(user?.rol === 'admin' || user?.rol === 'administrativo') && (
-          <>
-            <MenuItem onClick={handleEditExpediente}>
-              <EditIcon sx={{ mr: 1 }} />
-              Editar Expediente
-            </MenuItem>
-            <MenuItem onClick={handleDeleteExpediente} sx={{ color: 'error.main' }}>
-              <DeleteIcon sx={{ mr: 1 }} />
-              Eliminar Expediente
-            </MenuItem>
-          </>
-        )}
-      </Menu>
+      {/* Modals */}
+      <ExpedienteModal
+        open={modalOpen}
+        onClose={() => setModalOpen(false)}
+        expediente={editingExpediente}
+        onSuccess={handleModalSuccess}
+      />
+
+      <ExpedienteDetailModal
+        open={detailModalOpen}
+        onClose={() => setDetailModalOpen(false)}
+        expedienteId={viewingExpedienteId}
+        onEdit={handleEditExpedienteModal}
+        onDelete={handleDeleteExpedienteModal}
+      />
     </Box>
   );
 };

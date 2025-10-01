@@ -1,8 +1,46 @@
 import axios from 'axios';
 import { toast } from 'react-toastify';
 
+// Función para detectar la URL base del backend automáticamente
+const getBaseURL = () => {
+  // Si hay una variable de entorno definida, usarla
+  if (process.env.REACT_APP_API_URL) {
+    return process.env.REACT_APP_API_URL;
+  }
+  
+  // Detectar si estamos accediendo desde red local
+  const currentHost = window.location.hostname;
+  
+  // Si estamos en localhost o 127.0.0.1, usar localhost para el backend
+  if (currentHost === 'localhost' || currentHost === '127.0.0.1') {
+    return 'http://localhost:3000/api';
+  }
+  
+  // Si estamos en una IP de red local, usar la misma IP para el backend
+  if (currentHost.match(/^192\.168\.\d+\.\d+$/)) {
+    return `http://${currentHost}:3000/api`;
+  }
+  
+  // Si estamos en una IP de red local (10.x.x.x), usar la misma IP para el backend
+  if (currentHost.match(/^10\.\d+\.\d+\.\d+$/)) {
+    return `http://${currentHost}:3000/api`;
+  }
+  
+  // Si estamos en una IP de red local (172.16-31.x.x), usar la misma IP para el backend
+  if (currentHost.match(/^172\.(1[6-9]|2[0-9]|3[0-1])\.\d+\.\d+$/)) {
+    return `http://${currentHost}:3000/api`;
+  }
+  
+  // Por defecto, usar localhost
+  return 'http://localhost:3000/api';
+};
+
 // Base URL del backend
-const BASE_URL = process.env.REACT_APP_API_URL || 'http://localhost:3000/api';
+const BASE_URL = getBaseURL();
+
+// Log para debugging
+console.log('🌐 Frontend URL:', window.location.origin);
+console.log('🔗 Backend URL:', BASE_URL);
 
 // Create axios instance
 const api = axios.create({

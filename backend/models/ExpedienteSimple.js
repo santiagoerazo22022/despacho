@@ -30,16 +30,16 @@ const ExpedienteSimple = sequelize.define('ExpedienteSimple', {
   },
   dni: {
     type: DataTypes.STRING(20),
-    allowNull: false,
+    allowNull: true,
     validate: {
-      notEmpty: true
+      len: [0, 20]
     }
   },
   area: {
     type: DataTypes.STRING(100),
-    allowNull: false,
+    allowNull: true,
     validate: {
-      notEmpty: true
+      len: [0, 100]
     }
   },
   descripcion: {

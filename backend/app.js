@@ -19,6 +19,7 @@ const userRoutes = require('./routes/users');
 const clienteRoutes = require('./routes/clientes');
 const expedienteRoutes = require('./routes/expedientes');
 const expedienteSimpleRoutes = require('./routes/expedientesSimple');
+const decretoRoutes = require('./routes/decretos');
 
 // Create Express app
 const app = express();
@@ -39,9 +40,35 @@ const limiter = rateLimit({
 });
 app.use('/api/', limiter);
 
-// CORS configuration
+// CORS configuration - Permitir acceso desde localhost y red local
+const allowedOrigins = [
+  'http://localhost:3001',
+  'http://127.0.0.1:3001',
+  'http://192.168.1.115:3001', // Reemplaza con tu IP de red local
+  process.env.FRONTEND_URL,
+  process.env.FRONTEND_URL_NETWORK
+].filter(Boolean); // Eliminar valores undefined
+
 app.use(cors({
-  origin: process.env.FRONTEND_URL || 'http://localhost:3001',
+  origin: function (origin, callback) {
+    // Permitir requests sin origin (como mobile apps o Postman)
+    if (!origin) return callback(null, true);
+    
+    if (allowedOrigins.indexOf(origin) !== -1) {
+      callback(null, true);
+    } else {
+      // En desarrollo, permitir cualquier origen de localhost o IP local
+      if (process.env.NODE_ENV === 'development') {
+        const isLocalhost = origin.includes('localhost') || 
+                           origin.includes('127.0.0.1') || 
+                           origin.match(/^http:\/\/192\.168\.\d+\.\d+:\d+$/);
+        if (isLocalhost) {
+          return callback(null, true);
+        }
+      }
+      callback(new Error('No permitido por CORS'));
+    }
+  },
   credentials: true,
   methods: ['GET', 'POST', 'PUT', 'DELETE', 'OPTIONS'],
   allowedHeaders: ['Content-Type', 'Authorization']
@@ -65,7 +92,7 @@ app.use('/uploads', express.static('uploads'));
 app.get('/health', (req, res) => {
   res.json({
     success: true,
-    message: 'Servidor funcionando correctamente',
+    message: 'Sistema de Gestión - Oficina de Despacho General funcionando correctamente',
     timestamp: new Date().toISOString(),
     environment: process.env.NODE_ENV || 'development'
   });
@@ -77,12 +104,13 @@ app.use('/api/users', userRoutes);
 app.use('/api/clientes', clienteRoutes);
 app.use('/api/expedientes', expedienteRoutes);
 app.use('/api/expedientes-simple', expedienteSimpleRoutes);
+app.use('/api/decretos', decretoRoutes);
 
 // API info endpoint
 app.get('/api', (req, res) => {
   res.json({
     success: true,
-    message: 'API del Sistema de Expedientes',
+    message: 'API del Sistema de Gestión - Oficina de Despacho General',
     version: '1.0.0',
     endpoints: {
       auth: '/api/auth',
@@ -90,6 +118,7 @@ app.get('/api', (req, res) => {
       clientes: '/api/clientes',
       expedientes: '/api/expedientes',
       expedientesSimple: '/api/expedientes-simple',
+      decretos: '/api/decretos',
       documentos: '/api/expedientes/:id/documentos'
     }
   });
@@ -160,12 +189,14 @@ const startServer = async () => {
     // Create admin user if it doesn't exist
     await createAdminUserIfNotExists();
 
-    // Start server
-    app.listen(PORT, () => {
-      console.log(`🚀 Server running on port ${PORT}`);
+    // Start server - Escuchar en todas las interfaces de red para acceso desde red local
+    const HOST = process.env.HOST || '0.0.0.0'; // Permitir acceso desde red local
+    app.listen(PORT, HOST, () => {
+      console.log(`🚀 Server running on ${HOST}:${PORT}`);
       console.log(`📊 Environment: ${process.env.NODE_ENV || 'development'}`);
       console.log(`🔗 Health check: http://localhost:${PORT}/health`);
       console.log(`📡 API base URL: http://localhost:${PORT}/api`);
+      console.log(`🌐 Network access: http://192.168.1.115:${PORT}/api`); // Reemplaza con tu IP
     });
 
   } catch (error) {

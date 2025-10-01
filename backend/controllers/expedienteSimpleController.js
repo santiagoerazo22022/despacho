@@ -1,25 +1,39 @@
 const ExpedienteSimple = require('../models/ExpedienteSimple');
-const { User } = require('../models');
+const { User, Decreto } = require('../models');
 const { validationResult } = require('express-validator');
 const { Op } = require('sequelize');
-const { generatePaymentReceipt, generateUniqueFilename, ensureComprobantesDir } = require('../utils/pdfGenerator');
+const { generateExpedienteSimpleReceipt, generateUniqueFilename, ensureComprobantesDir } = require('../utils/pdfGenerator');
 const path = require('path');
 
 /**
- * Generate unique expediente number
+ * Generate unique expediente number based on type
  */
-const generateExpedienteNumber = async () => {
-  const year = new Date().getFullYear();
-  const count = await ExpedienteSimple.count({
+const generateExpedienteNumber = async (tipoExpediente = true) => {
+  const year = new Date().getFullYear().toString().slice(-2); // Obtener últimos 2 dígitos del año
+  
+  // Buscar el número más alto existente para este año y tipo
+  const lastExpediente = await ExpedienteSimple.findOne({
     where: {
       numero_expediente: {
-        [Op.like]: `${year}-%`
-      }
-    }
+        [Op.like]: `%/${year}`
+      },
+      tipo_expediente: tipoExpediente
+    },
+    order: [['numero_expediente', 'DESC']]
   });
   
-  const number = String(count + 1).padStart(4, '0');
-  return `${year}-${number}`;
+  let nextNumber = 1;
+  if (lastExpediente) {
+    // Extraer el número del formato "número/año"
+    const match = lastExpediente.numero_expediente.match(/^(\d+)\/\d+$/);
+    if (match) {
+      nextNumber = parseInt(match[1]) + 1;
+    }
+  }
+  
+  const generatedNumber = `${nextNumber}/${year}`;
+  console.log(`Generated expediente number: ${generatedNumber} for tipo: ${tipoExpediente}`);
+  return generatedNumber;
 };
 
 /**
@@ -27,17 +41,34 @@ const generateExpedienteNumber = async () => {
  */
 const generateExpedienteComprobante = async (expedienteData, usuario) => {
   try {
-    const { generateExpedienteSimpleReceipt, ensureComprobantesDir, generateUniqueFilename } = require('../utils/pdfGenerator');
+    console.log('Starting PDF generation...');
+    console.log('Expediente data:', {
+      id: expedienteData.id,
+      numero_expediente: expedienteData.numero_expediente,
+      nombre_solicitante: expedienteData.nombre_solicitante
+    });
+    console.log('Usuario data:', {
+      id: usuario.id,
+      nombre: usuario.nombre,
+      apellido: usuario.apellido
+    });
     
     const comprobantesDir = ensureComprobantesDir();
-    const filename = generateUniqueFilename(`comprobante-exp-${expedienteData.numero_expediente}`, 'pdf');
+    console.log('Comprobantes directory:', comprobantesDir);
+    
+    const safeNumeroExpediente = expedienteData.numero_expediente.replace(/\//g, '-');
+    const filename = generateUniqueFilename(`comprobante-exp-${safeNumeroExpediente}`, 'pdf');
     const outputPath = path.join(comprobantesDir, filename);
+    
+    console.log('Output path:', outputPath);
 
     // Use the improved PDF generator
     await generateExpedienteSimpleReceipt(expedienteData, usuario, outputPath);
+    console.log('PDF generation completed successfully');
     
     return outputPath;
   } catch (error) {
+    console.error('Error in generateExpedienteComprobante:', error);
     throw error;
   }
 };
@@ -65,7 +96,6 @@ const getExpedientes = async (req, res) => {
       whereClause[Op.or] = [
         { numero_expediente: { [Op.like]: `%${search}%` } },
         { nombre_solicitante: { [Op.like]: `%${search}%` } },
-        { dni: { [Op.like]: `%${search}%` } },
         { descripcion: { [Op.like]: `%${search}%` } }
       ];
     }
@@ -153,6 +183,14 @@ const getExpedienteById = async (req, res) => {
         }
       ]
     });
+    
+    console.log('Expediente found:', {
+      id: expediente?.id,
+      numero_expediente: expediente?.numero_expediente,
+      nombre_solicitante: expediente?.nombre_solicitante,
+      ruta_comprobante_pdf: expediente?.ruta_comprobante_pdf,
+      usuario_creador: expediente?.usuario_creador?.nombre
+    });
 
     if (!expediente) {
       return res.status(404).json({
@@ -191,15 +229,15 @@ const createExpediente = async (req, res) => {
     }
 
     const { 
-      numero_expediente,
       nombre_solicitante, 
-      dni, 
       area, 
-      descripcion 
+      descripcion,
+      tipo_expediente = true
     } = req.body;
 
-    // Generate expediente number if not provided
-    const numeroExpediente = numero_expediente || await generateExpedienteNumber();
+    // Generate expediente number automatically
+    const numeroExpediente = await generateExpedienteNumber(tipo_expediente);
+    console.log('Generated expediente number:', numeroExpediente);
 
     // Handle file upload if present
     let nombreArchivoEscaneado = null;
@@ -214,22 +252,28 @@ const createExpediente = async (req, res) => {
     const expedienteData = {
       numero_expediente: numeroExpediente,
       nombre_solicitante,
-      dni,
       area,
       descripcion,
+      tipo_expediente,
       nombre_archivo_escaneado: nombreArchivoEscaneado,
       ruta_archivo_escaneado: rutaArchivoEscaneado,
       usuario_creador_id: req.user.id
     };
 
+    console.log('Creating expediente with data:', expedienteData);
     const expediente = await ExpedienteSimple.create(expedienteData);
+    console.log('Expediente created successfully:', expediente.id);
 
     // Generate PDF receipt automatically
     try {
+      console.log('Generating PDF for expediente:', expediente.numero_expediente);
       const pdfPath = await generateExpedienteComprobante(expediente, req.user);
+      console.log('PDF generated successfully at:', pdfPath);
       await expediente.update({ ruta_comprobante_pdf: pdfPath });
+      console.log('PDF path saved to database');
     } catch (pdfError) {
       console.error('Error generating PDF:', pdfError);
+      console.error('PDF Error details:', pdfError.message);
       // Continue without PDF - don't fail the whole operation
     }
 
@@ -241,7 +285,17 @@ const createExpediente = async (req, res) => {
           as: 'usuario_creador',
           attributes: ['id', 'nombre', 'apellido', 'email']
         }
-      ]
+      ],
+      attributes: {
+        include: ['ruta_comprobante_pdf', 'nombre_archivo_escaneado', 'ruta_archivo_escaneado']
+      }
+    });
+
+    console.log('Created expediente data:', {
+      id: createdExpediente.id,
+      numero_expediente: createdExpediente.numero_expediente,
+      ruta_comprobante_pdf: createdExpediente.ruta_comprobante_pdf,
+      usuario_creador: createdExpediente.usuario_creador?.nombre
     });
 
     res.status(201).json({
@@ -257,8 +311,26 @@ const createExpediente = async (req, res) => {
         fs.unlinkSync(req.file.path);
       }
     }
-    
+
     console.error('Create expediente error:', error);
+    
+    // Handle specific error cases
+    if (error.message === 'No se pudo generar un número de expediente único después de varios intentos') {
+      return res.status(409).json({
+        success: false,
+        message: 'Error al generar número de expediente único. Por favor, intente nuevamente.',
+        error: 'CONFLICT_NUMBER_GENERATION'
+      });
+    }
+    
+    if (error.name === 'SequelizeUniqueConstraintError' && error.errors[0].path === 'numero_expediente') {
+      return res.status(409).json({
+        success: false,
+        message: 'Ya existe un expediente con este número. Por favor, intente nuevamente.',
+        error: 'DUPLICATE_NUMBER'
+      });
+    }
+
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor',
@@ -426,6 +498,7 @@ const downloadExpedienteFile = async (req, res) => {
 const downloadComprobantePDF = async (req, res) => {
   try {
     const { id } = req.params;
+    console.log('Downloading comprobante PDF for expediente:', id);
 
     const whereClause = { id };
     
@@ -435,8 +508,14 @@ const downloadComprobantePDF = async (req, res) => {
     }
 
     const expediente = await ExpedienteSimple.findOne({ where: whereClause });
+    console.log('Expediente found:', {
+      id: expediente?.id,
+      numero_expediente: expediente?.numero_expediente,
+      ruta_comprobante_pdf: expediente?.ruta_comprobante_pdf
+    });
 
     if (!expediente) {
+      console.log('Expediente not found');
       return res.status(404).json({
         success: false,
         message: 'Expediente no encontrado'
@@ -444,6 +523,7 @@ const downloadComprobantePDF = async (req, res) => {
     }
 
     if (!expediente.ruta_comprobante_pdf) {
+      console.log('No PDF path found for expediente');
       return res.status(404).json({
         success: false,
         message: 'No hay comprobante PDF para este expediente'
@@ -460,10 +540,144 @@ const downloadComprobantePDF = async (req, res) => {
     }
 
     // Send file
-    const filename = `comprobante-${expediente.numero_expediente}.pdf`;
+    const safeNumeroExpediente = expediente.numero_expediente.replace(/\//g, '-');
+    const filename = `comprobante-${safeNumeroExpediente}.pdf`;
     res.download(expediente.ruta_comprobante_pdf, filename);
   } catch (error) {
     console.error('Download comprobante PDF error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+/**
+ * Get decretos vinculados to an expediente
+ */
+const getDecretosVinculados = async (req, res) => {
+  try {
+    const { id } = req.params;
+
+    const whereClause = { id };
+    
+    // If user is not admin, only show their expedientes
+    if (req.user.rol !== 'admin') {
+      whereClause.usuario_creador_id = req.user.id;
+    }
+
+    const expediente = await ExpedienteSimple.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: Decreto,
+          as: 'decretos_vinculados',
+          attributes: ['id', 'numero_decreto', 'tipo_documento', 'titulo', 'estado', 'fecha_emision', 'fecha_vigencia', 'autoridad_emisora', 'ruta_archivo', 'nombre_archivo', 'createdAt'],
+          include: [
+            {
+              model: User,
+              as: 'usuario_creador',
+              attributes: ['id', 'nombre', 'apellido', 'email']
+            }
+          ],
+          order: [['fecha_emision', 'DESC']]
+        }
+      ]
+    });
+
+    if (!expediente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expediente no encontrado'
+      });
+    }
+
+    res.json({
+      success: true,
+      data: {
+        expediente: {
+          id: expediente.id,
+          numero_expediente: expediente.numero_expediente,
+          nombre_solicitante: expediente.nombre_solicitante,
+          area: expediente.area,
+          tipo_expediente: expediente.tipo_expediente
+        },
+        decretos: expediente.decretos_vinculados
+      }
+    });
+  } catch (error) {
+    console.error('Get decretos vinculados error:', error);
+    res.status(500).json({
+      success: false,
+      message: 'Error interno del servidor',
+      error: process.env.NODE_ENV === 'development' ? error.message : undefined
+    });
+  }
+};
+
+// Download decreto file from vinculated decreto
+const downloadDecretoFileFromExpediente = async (req, res) => {
+  try {
+    const { id, decretoId } = req.params;
+
+    const whereClause = { id };
+    
+    // If user is not admin, only show their expedientes
+    if (req.user.rol !== 'admin') {
+      whereClause.usuario_creador_id = req.user.id;
+    }
+
+    const expediente = await ExpedienteSimple.findOne({
+      where: whereClause,
+      include: [
+        {
+          model: Decreto,
+          as: 'decretos_vinculados',
+          where: { id: decretoId },
+          attributes: ['id', 'numero_decreto', 'ruta_archivo', 'nombre_archivo']
+        }
+      ]
+    });
+
+    if (!expediente) {
+      return res.status(404).json({
+        success: false,
+        message: 'Expediente no encontrado'
+      });
+    }
+
+    const decreto = expediente.decretos_vinculados[0];
+
+    if (!decreto) {
+      return res.status(404).json({
+        success: false,
+        message: 'Decreto no encontrado o no vinculado a este expediente'
+      });
+    }
+
+    if (!decreto.ruta_archivo) {
+      return res.status(404).json({
+        success: false,
+        message: 'No hay archivo asociado al decreto vinculado'
+      });
+    }
+
+    const filePath = path.resolve(decreto.ruta_archivo);
+    
+    // Check if file exists
+    const fs = require('fs');
+    if (!fs.existsSync(filePath)) {
+      return res.status(404).json({
+        success: false,
+        message: 'El archivo del decreto no existe en el servidor'
+      });
+    }
+
+    res.download(filePath, decreto.nombre_archivo || 'decreto.pdf');
+
+  } catch (error) {
+    console.error('Download decreto file from expediente error:', error);
     res.status(500).json({
       success: false,
       message: 'Error interno del servidor',
@@ -479,6 +693,8 @@ module.exports = {
   updateExpediente,
   deleteExpediente,
   downloadExpedienteFile,
-  downloadComprobantePDF
+  downloadComprobantePDF,
+  getDecretosVinculados,
+  downloadDecretoFileFromExpediente
 };
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   Box,
   Typography,
@@ -25,7 +25,6 @@ import {
   InputLabel,
   Select,
   Grid,
-  Alert,
 } from '@mui/material';
 import {
   Add as AddIcon,
@@ -60,6 +59,13 @@ const updateUserSchema = yup.object({
   telefono: yup.string().nullable(),
 });
 
+const updatePasswordSchema = yup.object({
+  password: yup.string().required('La contraseña es requerida').min(6, 'Mínimo 6 caracteres'),
+  confirmPassword: yup.string()
+    .required('Confirma la contraseña')
+    .oneOf([yup.ref('password')], 'Las contraseñas no coinciden'),
+});
+
 const UsersPage = () => {
   const [users, setUsers] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -72,18 +78,27 @@ const UsersPage = () => {
   const [selectedUser, setSelectedUser] = useState(null);
   const [dialogOpen, setDialogOpen] = useState(false);
   const [dialogType, setDialogType] = useState('create');
+  const [passwordDialogOpen, setPasswordDialogOpen] = useState(false);
 
   const {
     register,
     handleSubmit,
     formState: { errors },
     reset,
-    setValue,
   } = useForm({
     resolver: yupResolver(dialogType === 'create' ? createUserSchema : updateUserSchema),
   });
 
-  const fetchUsers = async () => {
+  const {
+    register: registerPassword,
+    handleSubmit: handleSubmitPassword,
+    formState: { errors: passwordErrors },
+    reset: resetPassword,
+  } = useForm({
+    resolver: yupResolver(updatePasswordSchema),
+  });
+
+  const fetchUsers = useCallback(async () => {
     try {
       setLoading(true);
       const params = {
@@ -101,11 +116,11 @@ const UsersPage = () => {
     } finally {
       setLoading(false);
     }
-  };
+  }, [page, rowsPerPage, searchTerm, rolFilter]);
 
   useEffect(() => {
     fetchUsers();
-  }, [page, rowsPerPage, searchTerm, rolFilter]);
+  }, [page, rowsPerPage, searchTerm, rolFilter, fetchUsers]);
 
   const handleChangePage = (event, newPage) => {
     setPage(newPage);
@@ -163,6 +178,30 @@ const UsersPage = () => {
     handleMenuClose();
   };
 
+  const handleUpdatePassword = () => {
+    resetPassword({
+      password: '',
+      confirmPassword: ''
+    });
+    setPasswordDialogOpen(true);
+    handleMenuClose();
+  };
+
+  const onSubmitPassword = async (data) => {
+    try {
+      await userService.updateUser(selectedUser.id, { password: data.password });
+      toast.success('Contraseña actualizada exitosamente');
+      setPasswordDialogOpen(false);
+      resetPassword();
+    } catch (error) {
+      console.error('Error al actualizar contraseña:', error);
+      const message = error.response?.data?.message || 
+                     error.response?.data?.errors?.[0]?.msg ||
+                     'Error al actualizar la contraseña';
+      toast.error(message);
+    }
+  };
+
   const onSubmit = async (data) => {
     try {
       if (dialogType === 'create') {
@@ -200,27 +239,50 @@ const UsersPage = () => {
   };
 
   const formatDate = (dateString) => {
-    return new Date(dateString).toLocaleDateString('es-ES');
+    if (!dateString) {
+      return 'N/A';
+    }
+    
+    try {
+      const date = new Date(dateString);
+      if (isNaN(date.getTime())) {
+        return 'Fecha inválida';
+      }
+      return date.toLocaleDateString('es-ES');
+    } catch (error) {
+      return 'Fecha inválida';
+    }
   };
 
   return (
-    <Box>
-      <Box sx={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', mb: 3 }}>
-        <Typography variant="h4">
+    <Box sx={{ p: { xs: 1, sm: 2, md: 3 } }}>
+      <Box sx={{ 
+        display: 'flex', 
+        flexDirection: { xs: 'column', sm: 'row' },
+        justifyContent: 'space-between', 
+        alignItems: { xs: 'flex-start', sm: 'center' },
+        mb: 3,
+        gap: { xs: 2, sm: 0 }
+      }}>
+        <Typography variant="h4" sx={{ fontSize: { xs: '1.5rem', sm: '2rem', md: '2.125rem' } }}>
           Gestión de Usuarios
         </Typography>
         <Button
           variant="contained"
           startIcon={<AddIcon />}
           onClick={handleCreateUser}
+          size="large"
+          sx={{ width: { xs: '100%', sm: 'auto' } }}
         >
-          Nuevo Usuario
+          <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+            Nuevo Usuario
+          </Typography>
         </Button>
       </Box>
 
       {/* Filters */}
-      <Paper sx={{ p: 2, mb: 3 }}>
-        <Grid container spacing={2} alignItems="center">
+      <Paper sx={{ p: { xs: 2, sm: 3 }, mb: 3 }}>
+        <Grid container spacing={{ xs: 2, sm: 3 }} alignItems="center">
           <Grid item xs={12} sm={6} md={6}>
             <TextField
               fullWidth
@@ -230,18 +292,24 @@ const UsersPage = () => {
                 setSearchTerm(e.target.value);
                 setPage(0);
               }}
+              size="medium"
+              sx={{
+                '& .MuiInputBase-root': {
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }
+              }}
               InputProps={{
                 startAdornment: (
                   <InputAdornment position="start">
-                    <SearchIcon />
+                    <SearchIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                   </InputAdornment>
                 ),
               }}
             />
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
-            <FormControl fullWidth>
-              <InputLabel>Rol</InputLabel>
+            <FormControl fullWidth size="medium">
+              <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Rol</InputLabel>
               <Select
                 value={rolFilter}
                 label="Rol"
@@ -249,10 +317,13 @@ const UsersPage = () => {
                   setRolFilter(e.target.value);
                   setPage(0);
                 }}
+                sx={{
+                  fontSize: { xs: '0.875rem', sm: '1rem' }
+                }}
               >
-                <MenuItem value="">Todos</MenuItem>
-                <MenuItem value="admin">Admin</MenuItem>
-                <MenuItem value="administrativo">Administrativo</MenuItem>
+                <MenuItem value="" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Todos</MenuItem>
+                <MenuItem value="admin" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Admin</MenuItem>
+                <MenuItem value="administrativo" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Administrativo</MenuItem>
               </Select>
             </FormControl>
           </Grid>
@@ -265,25 +336,37 @@ const UsersPage = () => {
                 setRolFilter('');
                 setPage(0);
               }}
+              size="large"
+              sx={{ py: { xs: 1.5, sm: 2 } }}
             >
-              Limpiar
+              <Typography sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>
+                Limpiar
+              </Typography>
             </Button>
           </Grid>
         </Grid>
       </Paper>
 
       {/* Table */}
-      <TableContainer component={Paper}>
-        <Table>
+      <TableContainer component={Paper} sx={{ overflowX: 'auto' }}>
+        <Table sx={{ minWidth: 600 }}>
           <TableHead>
             <TableRow>
-              <TableCell>Nombre</TableCell>
-              <TableCell>Email</TableCell>
-              <TableCell>Rol</TableCell>
-              <TableCell>Teléfono</TableCell>
-              <TableCell>Estado</TableCell>
-              <TableCell>Fecha Registro</TableCell>
-              <TableCell align="center">Acciones</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Nombre</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Email</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Rol</TableCell>
+              <TableCell sx={{ 
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                fontWeight: 'bold',
+                display: { xs: 'none', sm: 'table-cell' }
+              }}>Teléfono</TableCell>
+              <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Estado</TableCell>
+              <TableCell sx={{ 
+                fontSize: { xs: '0.75rem', sm: '0.875rem' }, 
+                fontWeight: 'bold',
+                display: { xs: 'none', md: 'table-cell' }
+              }}>Fecha Registro</TableCell>
+              <TableCell align="center" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' }, fontWeight: 'bold' }}>Acciones</TableCell>
             </TableRow>
           </TableHead>
           <TableBody>
@@ -302,34 +385,51 @@ const UsersPage = () => {
             ) : (
               users.map((user) => (
                 <TableRow key={user.id} hover>
-                  <TableCell>
-                    <Typography variant="body2" fontWeight="bold">
+                  <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <Typography variant="body2" fontWeight="bold" sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       {user.nombre} {user.apellido}
                     </Typography>
                   </TableCell>
-                  <TableCell>{user.email}</TableCell>
+                  <TableCell sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                    <Typography sx={{ fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
+                      {user.email}
+                    </Typography>
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={user.rol}
                       size="small"
                       color={getRolColor(user.rol)}
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     />
                   </TableCell>
-                  <TableCell>{user.telefono || 'N/A'}</TableCell>
+                  <TableCell sx={{ 
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    display: { xs: 'none', sm: 'table-cell' }
+                  }}>
+                    {user.telefono || 'N/A'}
+                  </TableCell>
                   <TableCell>
                     <Chip
                       label={user.activo ? 'Activo' : 'Inactivo'}
                       size="small"
                       color={user.activo ? 'success' : 'default'}
+                      sx={{ fontSize: { xs: '0.7rem', sm: '0.75rem' } }}
                     />
                   </TableCell>
-                  <TableCell>{formatDate(user.created_at)}</TableCell>
+                  <TableCell sx={{ 
+                    fontSize: { xs: '0.75rem', sm: '0.875rem' },
+                    display: { xs: 'none', md: 'table-cell' }
+                  }}>
+                    {formatDate(user.created_at)}
+                  </TableCell>
                   <TableCell align="center">
                     <IconButton
                       size="small"
                       onClick={(e) => handleMenuClick(e, user)}
+                      sx={{ p: { xs: 0.5, sm: 1 } }}
                     >
-                      <MoreVertIcon />
+                      <MoreVertIcon sx={{ fontSize: { xs: '1.2rem', sm: '1.5rem' } }} />
                     </IconButton>
                   </TableCell>
                 </TableRow>
@@ -347,6 +447,15 @@ const UsersPage = () => {
           onPageChange={handleChangePage}
           onRowsPerPageChange={handleChangeRowsPerPage}
           labelRowsPerPage="Filas por página:"
+          sx={{
+            '& .MuiTablePagination-toolbar': {
+              flexDirection: { xs: 'column', sm: 'row' },
+              gap: { xs: 1, sm: 0 }
+            },
+            '& .MuiTablePagination-selectLabel, & .MuiTablePagination-displayedRows': {
+              fontSize: { xs: '0.75rem', sm: '0.875rem' }
+            }
+          }}
         />
       </TableContainer>
 
@@ -360,6 +469,10 @@ const UsersPage = () => {
           <EditIcon sx={{ mr: 1 }} />
           Editar
         </MenuItem>
+        <MenuItem onClick={handleUpdatePassword}>
+          <LockResetIcon sx={{ mr: 1 }} />
+          Actualizar Contraseña
+        </MenuItem>
         <MenuItem onClick={handleDeleteUser}>
           <DeleteIcon sx={{ mr: 1 }} />
           Eliminar
@@ -367,13 +480,24 @@ const UsersPage = () => {
       </Menu>
 
       {/* User Dialog */}
-      <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth="sm" fullWidth>
+      <Dialog 
+        open={dialogOpen} 
+        onClose={() => setDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: { xs: 1, sm: 2 },
+            width: { xs: 'calc(100% - 16px)', sm: 'auto' }
+          }
+        }}
+      >
         <form onSubmit={handleSubmit(onSubmit)}>
-          <DialogTitle>
+          <DialogTitle sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
             {dialogType === 'create' ? 'Crear Usuario' : 'Editar Usuario'}
           </DialogTitle>
-          <DialogContent>
-            <Grid container spacing={2} sx={{ mt: 1 }}>
+          <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mt: 1 }}>
               <Grid item xs={12} sm={6}>
                 <TextField
                   fullWidth
@@ -381,6 +505,12 @@ const UsersPage = () => {
                   {...register('nombre')}
                   error={!!errors.nombre}
                   helperText={errors.nombre?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
                 />
               </Grid>
               <Grid item xs={12} sm={6}>
@@ -390,6 +520,12 @@ const UsersPage = () => {
                   {...register('apellido')}
                   error={!!errors.apellido}
                   helperText={errors.apellido?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
                 />
               </Grid>
               <Grid item xs={12}>
@@ -400,6 +536,12 @@ const UsersPage = () => {
                   {...register('email')}
                   error={!!errors.email}
                   helperText={errors.email?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
                 />
               </Grid>
               {dialogType === 'create' && (
@@ -411,22 +553,31 @@ const UsersPage = () => {
                     {...register('password')}
                     error={!!errors.password}
                     helperText={errors.password?.message}
+                    size="medium"
+                    sx={{
+                      '& .MuiInputBase-root': {
+                        fontSize: { xs: '0.875rem', sm: '1rem' }
+                      }
+                    }}
                   />
                 </Grid>
               )}
               <Grid item xs={12} sm={6}>
-                <FormControl fullWidth error={!!errors.rol}>
-                  <InputLabel>Rol *</InputLabel>
+                <FormControl fullWidth error={!!errors.rol} size="medium">
+                  <InputLabel sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Rol *</InputLabel>
                   <Select
                     label="Rol *"
                     {...register('rol')}
                     defaultValue="administrativo"
+                    sx={{
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }}
                   >
-                    <MenuItem value="admin">Admin</MenuItem>
-                    <MenuItem value="administrativo">Administrativo</MenuItem>
+                    <MenuItem value="admin" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Admin</MenuItem>
+                    <MenuItem value="administrativo" sx={{ fontSize: { xs: '0.875rem', sm: '1rem' } }}>Administrativo</MenuItem>
                   </Select>
                   {errors.rol && (
-                    <Typography variant="caption" color="error" sx={{ ml: 2 }}>
+                    <Typography variant="caption" color="error" sx={{ ml: 2, fontSize: { xs: '0.75rem', sm: '0.875rem' } }}>
                       {errors.rol?.message}
                     </Typography>
                   )}
@@ -439,16 +590,117 @@ const UsersPage = () => {
                   {...register('telefono')}
                   error={!!errors.telefono}
                   helperText={errors.telefono?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
                 />
               </Grid>
             </Grid>
           </DialogContent>
-          <DialogActions>
-            <Button onClick={() => setDialogOpen(false)}>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 }, gap: 1 }}>
+            <Button 
+              onClick={() => setDialogOpen(false)}
+              size="large"
+              sx={{ 
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                px: { xs: 2, sm: 3 }
+              }}
+            >
               Cancelar
             </Button>
-            <Button type="submit" variant="contained">
+            <Button 
+              type="submit" 
+              variant="contained"
+              size="large"
+              sx={{ 
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                px: { xs: 2, sm: 3 }
+              }}
+            >
               {dialogType === 'create' ? 'Crear' : 'Actualizar'}
+            </Button>
+          </DialogActions>
+        </form>
+      </Dialog>
+
+      {/* Password Update Dialog */}
+      <Dialog 
+        open={passwordDialogOpen} 
+        onClose={() => setPasswordDialogOpen(false)} 
+        maxWidth="sm" 
+        fullWidth
+        sx={{
+          '& .MuiDialog-paper': {
+            margin: { xs: 1, sm: 2 },
+            width: { xs: 'calc(100% - 16px)', sm: 'auto' }
+          }
+        }}
+      >
+        <form onSubmit={handleSubmitPassword(onSubmitPassword)}>
+          <DialogTitle sx={{ fontSize: { xs: '1.25rem', sm: '1.5rem' } }}>
+            Actualizar Contraseña - {selectedUser?.nombre} {selectedUser?.apellido}
+          </DialogTitle>
+          <DialogContent sx={{ p: { xs: 2, sm: 3 } }}>
+            <Grid container spacing={{ xs: 2, sm: 3 }} sx={{ mt: 1 }}>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Nueva Contraseña *"
+                  type="password"
+                  {...registerPassword('password')}
+                  error={!!passwordErrors.password}
+                  helperText={passwordErrors.password?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
+                />
+              </Grid>
+              <Grid item xs={12}>
+                <TextField
+                  fullWidth
+                  label="Confirmar Contraseña *"
+                  type="password"
+                  {...registerPassword('confirmPassword')}
+                  error={!!passwordErrors.confirmPassword}
+                  helperText={passwordErrors.confirmPassword?.message}
+                  size="medium"
+                  sx={{
+                    '& .MuiInputBase-root': {
+                      fontSize: { xs: '0.875rem', sm: '1rem' }
+                    }
+                  }}
+                />
+              </Grid>
+            </Grid>
+          </DialogContent>
+          <DialogActions sx={{ p: { xs: 2, sm: 3 }, gap: 1 }}>
+            <Button 
+              onClick={() => setPasswordDialogOpen(false)}
+              size="large"
+              sx={{ 
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                px: { xs: 2, sm: 3 }
+              }}
+            >
+              Cancelar
+            </Button>
+            <Button 
+              type="submit" 
+              variant="contained" 
+              color="primary"
+              size="large"
+              sx={{ 
+                fontSize: { xs: '0.875rem', sm: '1rem' },
+                px: { xs: 2, sm: 3 }
+              }}
+            >
+              Actualizar Contraseña
             </Button>
           </DialogActions>
         </form>

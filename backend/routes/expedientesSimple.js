@@ -45,6 +45,18 @@ router.get('/:id/download-comprobante',
   expedienteSimpleController.downloadComprobantePDF
 );
 
+// Get decretos vinculados to expediente
+router.get('/:id/decretos', 
+  commonValidation.id, 
+  expedienteSimpleController.getDecretosVinculados
+);
+
+// Download decreto file from vinculated decreto
+router.get('/:id/decretos/:decretoId/download-file', 
+  commonValidation.id, 
+  expedienteSimpleController.downloadDecretoFileFromExpediente
+);
+
 // Handle upload errors
 router.use(handleUploadError);
 

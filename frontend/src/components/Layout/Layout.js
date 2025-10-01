@@ -23,13 +23,15 @@ import {
   Menu as MenuIcon,
   Dashboard as DashboardIcon,
   Folder as FolderIcon,
+  Description as DescriptionIcon,
   People as PeopleIcon,
   Person as PersonIcon,
   ExitToApp as LogoutIcon,
-  Add as AddIcon,
 } from '@mui/icons-material';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { useAuth } from '../../contexts/AuthContext';
+import Logo from '../Logo/Logo';
+import logoImage from '../../assets/images/logo-despacho-general.png';
 
 const drawerWidth = 280;
 
@@ -75,9 +77,9 @@ const Layout = () => {
       roles: ['admin', 'administrativo'],
     },
     {
-      text: 'Nuevo Expediente',
-      icon: <AddIcon />,
-      path: '/expedientes/nuevo',
+      text: 'Decretos y Resoluciones',
+      icon: <DescriptionIcon />,
+      path: '/decretos',
       roles: ['admin', 'administrativo'],
     },
     {
@@ -95,9 +97,9 @@ const Layout = () => {
   const drawer = (
     <Box>
       <Toolbar>
-        <Typography variant="h6" noWrap component="div" color="primary">
-          Sistema Expedientes
-        </Typography>
+        <Box display="flex" alignItems="center" justifyContent="center" width="100%">
+          <Logo variant="icon" size="small" useImage={true} imageSrc={logoImage} />
+        </Box>
       </Toolbar>
       <Divider />
       <List>
@@ -165,7 +167,7 @@ const Layout = () => {
           </IconButton>
           
           <Typography variant="h6" noWrap component="div" sx={{ flexGrow: 1 }}>
-            Sistema de Expedientes
+            Sistema de Gestión - Oficina de Despacho General
           </Typography>
 
           <Box sx={{ display: 'flex', alignItems: 'center', gap: 2 }}>

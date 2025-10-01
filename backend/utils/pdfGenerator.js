@@ -288,6 +288,11 @@ const generateUniqueFilename = (prefix = 'document', extension = 'pdf') => {
 const generateExpedienteSimpleReceipt = (expedienteData, usuario, outputPath) => {
   return new Promise((resolve, reject) => {
     try {
+      console.log('PDFGenerator: Starting PDF generation');
+      console.log('PDFGenerator: Expediente data:', expedienteData);
+      console.log('PDFGenerator: Usuario data:', usuario);
+      console.log('PDFGenerator: Output path:', outputPath);
+      
       const doc = new PDFDocument({ 
         size: 'A4',
         margin: 40,
@@ -301,6 +306,8 @@ const generateExpedienteSimpleReceipt = (expedienteData, usuario, outputPath) =>
 
       const stream = fs.createWriteStream(outputPath);
       doc.pipe(stream);
+      
+      console.log('PDFGenerator: PDF document created and piped to stream');
 
       // Colors
       const primaryColor = '#1976d2';
@@ -376,10 +383,11 @@ const generateExpedienteSimpleReceipt = (expedienteData, usuario, outputPath) =>
 
       drawInfoRow('Nombre completo', expedienteData.nombre_solicitante, currentY);
       currentY += 25;
-      drawInfoRow('Documento de identidad', expedienteData.dni, currentY);
-      currentY += 25;
-      drawInfoRow('Área de consulta', expedienteData.area, currentY);
-      currentY += 25;
+      
+      if (expedienteData.area) {
+        drawInfoRow('Área', expedienteData.area, currentY);
+        currentY += 25;
+      }
       drawInfoRow('Fecha de carga', new Date(expedienteData.fecha_carga).toLocaleDateString('es-ES', {
         year: 'numeric',
         month: 'long', 
@@ -471,16 +479,20 @@ const generateExpedienteSimpleReceipt = (expedienteData, usuario, outputPath) =>
          .text('QR CODE', 495, footerY + 35);
 
       doc.end();
+      console.log('PDFGenerator: Document ended, waiting for stream to finish');
 
       stream.on('finish', () => {
+        console.log('PDFGenerator: Stream finished successfully');
         resolve(outputPath);
       });
 
       stream.on('error', (error) => {
+        console.error('PDFGenerator: Stream error:', error);
         reject(error);
       });
 
     } catch (error) {
+      console.error('PDFGenerator: Error in PDF generation:', error);
       reject(error);
     }
   });

@@ -35,23 +35,12 @@ const schema = yup.object({
     .required('El nombre del solicitante es requerido')
     .min(2, 'El nombre debe tener al menos 2 caracteres')
     .max(255, 'El nombre no puede exceder 255 caracteres'),
-  dni: yup
-    .string()
-    .required('El DNI es requerido')
-    .min(8, 'El DNI debe tener al menos 8 caracteres')
-    .max(20, 'El DNI no puede exceder 20 caracteres'),
   area: yup
     .string()
-    .required('El área es requerida')
-    .min(2, 'El área debe tener al menos 2 caracteres')
     .max(100, 'El área no puede exceder 100 caracteres'),
   descripcion: yup
     .string()
     .max(1000, 'La descripción no puede exceder 1000 caracteres'),
-  numero_expediente: yup
-    .string()
-    .min(4, 'El número de expediente debe tener al menos 4 caracteres')
-    .max(50, 'El número de expediente no puede exceder 50 caracteres'),
   tipo_expediente: yup
     .boolean()
     .required('El tipo es requerido'),
@@ -106,34 +95,35 @@ const CreateExpedientePage = () => {
       // Create FormData for file upload
       const formData = new FormData();
       formData.append('nombre_solicitante', data.nombre_solicitante);
-      formData.append('dni', data.dni);
       formData.append('area', data.area);
       formData.append('tipo_expediente', data.tipo_expediente === 'true' || data.tipo_expediente === true);
       if (data.descripcion) {
         formData.append('descripcion', data.descripcion);
-      }
-      if (data.numero_expediente) {
-        formData.append('numero_expediente', data.numero_expediente);
       }
       if (uploadedFile) {
         formData.append('archivo_escaneado', uploadedFile);
       }
 
       const response = await expedienteService.createExpediente(formData);
+      console.log('Create expediente response:', response);
       const expedienteId = response.data.expediente.id;
       
       toast.success('¡Expediente creado exitosamente!');
 
       // Automatically download and open the receipt for printing
       try {
+        console.log('Attempting to download comprobante for expediente:', expedienteId);
         const comprobanteResponse = await expedienteService.downloadComprobante(expedienteId);
+        console.log('Comprobante response received:', comprobanteResponse);
         
         // Create blob URL for the PDF
         const blob = new Blob([comprobanteResponse.data], { type: 'application/pdf' });
         const url = window.URL.createObjectURL(blob);
+        console.log('Blob URL created:', url);
         
         // Open PDF in new window for printing
         const printWindow = window.open(url, '_blank');
+        console.log('Print window opened:', printWindow);
         
         if (printWindow) {
           // Wait for the PDF to load and then trigger print dialog
@@ -148,7 +138,7 @@ const CreateExpedientePage = () => {
           // Fallback: download the file if popup is blocked
           const link = document.createElement('a');
           link.href = url;
-          link.download = `comprobante-${response.data.expediente.numero_expediente}.pdf`;
+          link.download = `comprobante-${response.data.expediente.numero_expediente.replace(/\//g, '-')}.pdf`;
           document.body.appendChild(link);
           link.click();
           document.body.removeChild(link);
@@ -223,10 +213,10 @@ const CreateExpedientePage = () => {
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    label="DNI *"
-                    {...register('dni')}
-                    error={!!errors.dni}
-                    helperText={errors.dni?.message}
+                    label="Área"
+                    {...register('area')}
+                    error={!!errors.area}
+                    helperText={errors.area?.message}
                     disabled={loading}
                   />
                 </Grid>
@@ -244,7 +234,7 @@ const CreateExpedientePage = () => {
                 <Grid item xs={12} md={6}>
                   <TextField
                     fullWidth
-                    label="Área *"
+                    label="Área"
                     {...register('area')}
                     error={!!errors.area}
                     helperText={errors.area?.message}
@@ -269,16 +259,6 @@ const CreateExpedientePage = () => {
                       </Typography>
                     )}
                   </FormControl>
-                </Grid>
-                <Grid item xs={12} md={6}>
-                  <TextField
-                    fullWidth
-                    label="Número de Expediente"
-                    {...register('numero_expediente')}
-                    error={!!errors.numero_expediente}
-                    helperText={errors.numero_expediente?.message || 'Si no se especifica, se generará automáticamente'}
-                    disabled={loading}
-                  />
                 </Grid>
                 <Grid item xs={12}>
                   <TextField

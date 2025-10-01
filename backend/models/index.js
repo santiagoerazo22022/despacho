@@ -8,6 +8,7 @@ const ExpedienteSimple = require('./ExpedienteSimple');
 const Documento = require('./Documento');
 const Cita = require('./Cita');
 const Pago = require('./Pago');
+const Decreto = require('./Decreto');
 
 // Define associations
 // User associations
@@ -40,6 +41,27 @@ User.hasMany(ExpedienteSimple, {
 ExpedienteSimple.belongsTo(User, { 
   foreignKey: 'usuario_creador_id', 
   as: 'usuario_creador' 
+});
+
+// Decreto associations
+User.hasMany(Decreto, { 
+  foreignKey: 'usuario_creador_id', 
+  as: 'decretos_creados' 
+});
+
+Decreto.belongsTo(User, { 
+  foreignKey: 'usuario_creador_id', 
+  as: 'usuario_creador' 
+});
+
+Decreto.belongsTo(ExpedienteSimple, { 
+  foreignKey: 'expediente_simple_id', 
+  as: 'expediente_vinculado' 
+});
+
+ExpedienteSimple.hasMany(Decreto, { 
+  foreignKey: 'expediente_simple_id', 
+  as: 'decretos_vinculados' 
 });
 
 // Cliente associations
@@ -136,5 +158,6 @@ module.exports = {
   ExpedienteSimple,
   Documento,
   Cita,
-  Pago
+  Pago,
+  Decreto
 };
